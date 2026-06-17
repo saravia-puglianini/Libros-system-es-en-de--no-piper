@@ -1,0 +1,13 @@
+# Archivo generado automáticamente para mapear scripts de shell a los lenguajes que ejecutan/utilizan
+# Esto ayuda a Linguist (GitHub) a mostrar los porcentajes de lenguajes correctos.
+
+init.sh linguist-language=Python
+Libros-LAN-stop.sh linguist-language=Python
+server-init.sh linguist-language=Python
+init-validate-all-portable-binaries.sh linguist-language=Python
+Libros-installer.sh linguist-language=Python
+scripting/vociferate-pdf.from.en.to.es.and.de.sh linguist-language=Python
+scripting/vociferate-pdf.from.de.to.en.and.es--page-by-page.sh linguist-language=Python
+scripting/vociferate-pdf.from.es.to.en.and.de--page-by-page.sh linguist-language=Python
+scripting/vociferate-pdf.from.en.to.es.and.de--page-by-page.sh linguist-language=Python
+scripting/vociferate-pdf.sh linguist-language=Python
