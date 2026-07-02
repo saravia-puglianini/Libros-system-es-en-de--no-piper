@@ -18,6 +18,23 @@ import base64
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.environ.get('PORTABLE_ROOT', os.path.dirname(SCRIPT_DIR) if os.path.basename(SCRIPT_DIR) == 'scripting' else SCRIPT_DIR)
 
+def get_total_pages(pdf_path):
+    try:
+        import subprocess
+        result = subprocess.run(['pdfinfo', pdf_path], capture_output=True, text=True, check=True)
+        for line in result.stdout.splitlines():
+            if line.startswith('Pages:'):
+                return int(line.split()[1])
+    except Exception:
+        pass
+    try:
+        import subprocess
+        result = subprocess.run(['qpdf', '--show-npages', pdf_path], capture_output=True, text=True, check=True)
+        return int(result.stdout.strip())
+    except Exception:
+        pass
+    return 0
+
 def get_book_name(pdf_path):
     base_name = os.path.basename(pdf_path)
     # Patrón: nombre_libro.<idioma>.pdf
@@ -468,6 +485,30 @@ def main():
     book_name = get_book_name(pdf_path)
     print(f"[*] Libro: '{book_name}'")
 
+    # Parse range if OVERRIDE_RANGE is set
+    total_pages = get_total_pages(pdf_path)
+    start_page = 1
+    end_page = total_pages
+    override_range = os.environ.get('OVERRIDE_RANGE')
+    if override_range:
+        range_str = override_range.strip()
+        if range_str and range_str != "0":
+            match_range = re.match(r'^(\d+)-(\d+)$', range_str)
+            if match_range:
+                start_page = int(match_range.group(1))
+                end_page = int(match_range.group(2))
+            else:
+                match_single = re.match(r'^(\d+)$', range_str)
+                if match_single:
+                    start_page = 1
+                    end_page = int(match_single.group(1))
+            
+            # Bound check
+            start_page = max(1, min(start_page, total_pages))
+            end_page = max(1, min(end_page, total_pages))
+            if start_page > end_page:
+                start_page, end_page = end_page, start_page
+
     # Leer textos traducidos
     cache_path = os.path.join(PROJECT_ROOT, 'personal', 'text_cache', f"{book_name}.json")
     if not os.path.exists(cache_path):
@@ -477,11 +518,49 @@ def main():
     with open(cache_path, 'r', encoding='utf-8') as f:
         text_map = json.load(f)
 
-    # Codificar el PDF original a Base64
-    print("[*] Codificando PDF a Base64...")
-    with open(pdf_path, 'rb') as f:
-        pdf_bytes = f.read()
-    pdf_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
+    # If partial range selected, crop PDF and reindex translations
+    if start_page > 1 or end_page < total_pages:
+        import tempfile
+        import subprocess
+        
+        filename = f"{os.path.basename(pdf_path)} (Pág. {start_page}-{end_page})"
+        print(f"[*] Recortando PDF para las páginas {start_page} a {end_page}...")
+        
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp_f:
+            temp_pdf_path = tmp_f.name
+        
+        try:
+            result = subprocess.run([
+                "qpdf", "--empty",
+                "--pages", pdf_path, f"{start_page}-{end_page}",
+                "--", temp_pdf_path
+            ], capture_output=True, text=True)
+            if result.returncode not in (0, 3):
+                raise subprocess.CalledProcessError(result.returncode, result.args, output=result.stdout, stderr=result.stderr)
+            
+            with open(temp_pdf_path, 'rb') as f:
+                pdf_bytes = f.read()
+            pdf_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
+        finally:
+            if os.path.exists(temp_pdf_path):
+                try:
+                    os.remove(temp_pdf_path)
+                except Exception:
+                    pass
+        
+        # Reindex text_map
+        new_text_map = {}
+        for p in range(1, (end_page - start_page + 1) + 1):
+            orig_page = start_page + p - 1
+            if str(orig_page) in text_map:
+                new_text_map[str(p)] = text_map[str(orig_page)]
+        text_map = new_text_map
+    else:
+        # Codificar el PDF original a Base64
+        print("[*] Codificando PDF a Base64...")
+        with open(pdf_path, 'rb') as f:
+            pdf_bytes = f.read()
+        pdf_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
     
     # Generar visor
     generate_htm(template_content, pdf_base64, text_map, filename, output_path)

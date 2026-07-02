@@ -392,6 +392,22 @@ if [[ "$mode_selection" == "1" ]]; then
         selected_lang="en"
     fi
     
+    # --- Rango de páginas interactivo ---
+    pages="${unconverted_pages[$selected_index]}"
+    echo ""
+    echo "Desde qué página a qué página desea convertir:"
+    echo "  [0] todas (1 a $pages)"
+    echo "  ejemplo [5-15] para del 5 al 15"
+    echo "  [10] desde la 1 hasta la 10"
+    echo ""
+    read -r -p "Selección [Por defecto: 0]: " pages_input || true
+    pages_input=$(echo "$pages_input" | tr -d '[:space:]')
+    if [[ -z "$pages_input" ]]; then
+        pages_input="0"
+    fi
+
+    export OVERRIDE_RANGE="$pages_input"
+
     echo ""
     echo "===================================================="
     echo "🎙️ PASO A: Extrayendo y traduciendo texto página por página (es, en, de)..."
@@ -410,6 +426,8 @@ if [[ "$mode_selection" == "1" ]]; then
     if [ "$selected_size_mb" -eq 0 ]; then selected_size_mb=1; fi
     "$PY_BIN" "$SCRIPT_DIR/scripting/generar_htm_con_audios.py" "$selected_pdf" "$HTM_AUDIO_DIR/${clean_book_name}.${selected_size_mb}.htm"
     
+    unset OVERRIDE_RANGE
+
     echo ""
     echo "🎉 ¡Conversión ardua completada con éxito!"
     echo "Continuando con el procesamiento general de la biblioteca..."

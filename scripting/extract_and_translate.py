@@ -229,8 +229,34 @@ def main():
     except Exception as e:
         print(f"⚠️ Warning calling pip: {e}. Make sure deep-translator is installed.")
     
+    # Parse range if OVERRIDE_RANGE is set
+    start_page = 1
+    end_page = total_pages
+    override_range = os.environ.get('OVERRIDE_RANGE')
+    if override_range:
+        range_str = override_range.strip()
+        if range_str and range_str != "0":
+            match_range = re.match(r'^(\d+)-(\d+)$', range_str)
+            if match_range:
+                start_page = int(match_range.group(1))
+                end_page = int(match_range.group(2))
+            else:
+                match_single = re.match(r'^(\d+)$', range_str)
+                if match_single:
+                    start_page = 1
+                    end_page = int(match_single.group(1))
+                else:
+                    print(f"⚠️ Selección no reconocida. Usando rango por defecto: todas (1 a {total_pages}).")
+            
+            # Bound check
+            start_page = max(1, min(start_page, total_pages))
+            end_page = max(1, min(end_page, total_pages))
+            if start_page > end_page:
+                start_page, end_page = end_page, start_page
+            print(f"[+] Rango seleccionado: Páginas {start_page} a {end_page}")
+
     # We loop pages and execute
-    for page in range(1, total_pages + 1):
+    for page in range(start_page, end_page + 1):
         str_page = str(page)
         page_cache = cache.get(str_page)
         

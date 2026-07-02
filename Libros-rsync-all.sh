@@ -48,10 +48,11 @@ for dir in Processed_htm_audios-*; do
 done
 
 echo "Subiendo archivos al servidor remoto demo:~/bin/ usando rsync..."
-# Sincronizar la estructura de /tmp/bin/ al servidor destino usando rsync -avz
+# Sincronizar la estructura de /tmp/bin/ al servidor destino usando rsync -avz --delete
 # Usamos -a (archivo: conserva permisos, marcas de tiempo, etc.), -v (detallado), -z (compresión)
+# La opción --delete elimina los archivos en el destino que ya no existen en el origen (locales)
 # La barra diagonal al final de "$TMP_BIN/" asegura que se sincronice el contenido y no el directorio 'bin' en sí
-rsync -avz "$TMP_BIN/" "$REMOTE_SERVER:~/bin/"
+rsync -avz --delete "$TMP_BIN/" "$REMOTE_SERVER:~/bin/"
 
 # Limpiar el directorio temporal local
 echo "Limpiando directorio temporal..."
