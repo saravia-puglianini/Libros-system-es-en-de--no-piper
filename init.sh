@@ -14,6 +14,23 @@ elif command -v python3.8 >/dev/null 2>&1; then export PY_BIN=python3.8
 else export PY_BIN=python3; fi
 
 # =========================================================
+# MENSAJE DE BIENVENIDA
+# =========================================================
+echo "========================================================="
+echo "👋 Hola Usuario,"
+echo ""
+echo "Este convertidor avanzado no tiene garantias, su uso es"
+echo "experimental y educativo, sin fines de lucro y puedes"
+echo "encontrar su codigo fuente en github como hecho por"
+echo "saravia_puglianini y la IA..."
+echo ""
+echo "Lo que si te puedo asegurar es que una vez escuches y"
+echo "estudies muchos libros con este sistema, conoceras"
+echo "muchas cosas... :D"
+echo "========================================================="
+echo ""
+
+# =========================================================
 # AUTO-REPARAR RUTAS ABSOLUTAS EN EL ESPACIO DE TRABAJO
 # =========================================================
 echo "⚙️  Auto-reparando rutas absolutas para esta copia del proyecto..."
@@ -349,6 +366,53 @@ elif [[ "$input_selection" == "3" ]]; then
     mode_selection="3"
 fi
 
+if [[ "$mode_selection" != "0" ]]; then
+    # Validar nombres de archivo de todos los PDFs antes de continuar
+    declare -a invalid_names=()
+    while IFS= read -r -d '' pdf; do
+        filename=$(basename "$pdf")
+        if [[ "$pdf" =~ /\.git/ || "$pdf" =~ /personal/tmp_ ]]; then
+            continue
+        fi
+        if [[ ! "$filename" =~ ^.+--.+\.(en|es|de)\.pdf$ ]]; then
+            invalid_names+=("$filename")
+        fi
+    done < <(find -L "$ABS_DIR" -maxdepth 1 -type f \( -iname "*.pdf" -o -iname "*.PDF" \) -print0)
+    
+    if [[ ${#invalid_names[@]} -gt 0 ]]; then
+        echo ""
+        echo "❌ ERROR DE SINTAXIS: Se detectaron nombres de archivo no estándar en la biblioteca:"
+        for bad_name in "${invalid_names[@]}"; do
+            echo "   - $bad_name"
+        done
+        echo ""
+        echo "La sintaxis esperada es:"
+        echo "  Autor-Nombre--Nombre-Libro.[en|es|de].pdf"
+        echo ""
+        echo "Ejemplos válidos:"
+        echo "  - Name-Autor--Name-book.en.pdf"
+        echo "  - Nombre-Autor--Nombre-del-libro.es.pdf"
+        echo "  - Name-Autor--Name-buch.de.pdf"
+        echo ""
+        echo "Por favor, corrija los nombres en el directorio y vuelva a ejecutar."
+        exit 1
+    fi
+
+    echo ""
+    echo "🌐 Seleccione el sistema de traducción:"
+    echo "[0] Google Internet Service (Remoto, recomendado)"
+    echo "[1] Apertium Local Program (Local, Experimental y DRM Freedom)"
+    echo ""
+    read -r -p "Seleccione opción [0/1] (Por defecto: 0): " input_engine || true
+    if [[ "$input_engine" == "1" ]]; then
+        export TRANSLATOR_SERVICE="apertium"
+        echo "✅ Sistema seleccionado: Apertium local"
+    else
+        export TRANSLATOR_SERVICE="google"
+        echo "✅ Sistema seleccionado: Google Translate"
+    fi
+fi
+
 if [[ "$mode_selection" == "1" ]]; then
     if [ "${DEBUG:-0}" = "1" ]; then
         echo "[DEBUG] mode_selection = $mode_selection"
@@ -444,7 +508,6 @@ if [[ "$mode_selection" == "1" ]]; then
                 time_est="${total_minutes}min"
             fi
         fi
-        
         echo "[$i] ${unconverted_names[$i]} - $pages páginas (Tiempo estimado $time_est) $status"
     done
     echo ""
@@ -522,6 +585,7 @@ if [[ "$mode_selection" == "1" ]]; then
 fi
 
 if [[ "$mode_selection" == "2" || "$mode_selection" == "3" ]]; then
+
     echo ""
     read -r -p "Desea iterar todos los pdfs? (si/no) [Por defecto: no]: " iterar_confirm || true
     iterar_confirm=$(echo "$iterar_confirm" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')

@@ -7,7 +7,7 @@ for folder in "$HOME"/Personal/Libros-*; do
         # Entrar al directorio
         cd "$folder" || continue
         # Ejecutar el comando
-        echo -e "2\n2\nsi\n0" | bash init.sh
+        echo -e "2\n2\n3\nsi\n0" | bash init.sh
         # Opcional: regresar al directorio anterior (buena práctica)
         cd - > /dev/null
     fi

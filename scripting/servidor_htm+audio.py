@@ -45,9 +45,25 @@ for folder in os.listdir(project_root):
 
 try:
     from deep_translator import GoogleTranslator
-    es = GoogleTranslator(source='auto', target='es').translate(sys.argv[1])
-    en = GoogleTranslator(source='auto', target='en').translate(sys.argv[1])
-    de = GoogleTranslator(source='auto', target='de').translate(sys.argv[1])
+    import time
+    
+    def translate_with_retry(text, target):
+        translator = GoogleTranslator(source='auto', target=target)
+        attempt = 1
+        while True:
+            try:
+                res = translator.translate(text)
+                if res:
+                    return res
+            except Exception as e:
+                import sys
+                print(f"⚠️ Error translating (attempt {attempt}): {e}", file=sys.stderr)
+            attempt += 1
+            time.sleep(2)
+
+    es = translate_with_retry(sys.argv[1], 'es')
+    en = translate_with_retry(sys.argv[1], 'en')
+    de = translate_with_retry(sys.argv[1], 'de')
     import json
     print(json.dumps({{'es': es, 'en': en, 'de': de}}))
 except Exception as e:

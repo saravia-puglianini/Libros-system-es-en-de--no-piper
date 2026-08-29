@@ -192,6 +192,7 @@ for folder in os.listdir(project_root):
             sys.path.insert(0, site_pkg)
 
 from deep_translator import GoogleTranslator
+import time
 
 def chunk_text(text, size=4000):
     return [text[i:i+size] for i in range(0, len(text), size)]
@@ -209,7 +210,20 @@ try:
     
     for chunk in chunks:
         if chunk.strip():
-            translated_chunks.append(translator.translate(chunk))
+            translated_chunk = None
+            attempt = 1
+            while True:
+                try:
+                    translated_chunk = translator.translate(chunk)
+                    if translated_chunk:
+                        break
+                except Exception as e:
+                    print(f"⚠️ Error translating chunk (attempt {attempt}): {e}", file=sys.stderr)
+                print("⏳ Esperando 2 segundos para reintentar traducción...", file=sys.stderr)
+                time.sleep(2)
+                attempt += 1
+            
+            translated_chunks.append(translated_chunk)
         else:
             translated_chunks.append(chunk)
             

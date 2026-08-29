@@ -107,15 +107,92 @@ def run_ocr(pdf_path, page, orig_lang):
                     return f.read()
     return ""
 
-def translate_page(text, target_lang):
+def call_apertium(text, mode):
+    portable_dir = None
+    for folder in os.listdir(PROJECT_ROOT):
+        if folder.startswith('portable-bin-'):
+            portable_dir = os.path.join(PROJECT_ROOT, folder)
+            break
+            
+    env = os.environ.copy()
+    if portable_dir:
+        apertium_bin = os.path.join(portable_dir, "bin", "apertium")
+        lib_path = os.path.join(portable_dir, "lib")
+        lib64_path = os.path.join(portable_dir, "lib64")
+        datadir = os.path.join(portable_dir, "share", "apertium")
+        env["LD_LIBRARY_PATH"] = f"/usr/lib64:{lib64_path}:{lib_path}:{env.get('LD_LIBRARY_PATH', '')}"
+        env["APERTIUM_DATADIR"] = datadir
+        cmd = apertium_bin
+    else:
+        cmd = "apertium"
+        
+    try:
+        res = subprocess.run(
+            [cmd, mode],
+            input=text.encode('utf-8'),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env=env
+        )
+        if res.returncode == 0:
+            return res.stdout.decode('utf-8').strip()
+        else:
+            print(f"⚠️ Apertium error: {res.stderr.decode('utf-8')}")
+    except Exception as e:
+        print(f"⚠️ Error running apertium: {e}")
+    return text
+
+def translate_apertium(text, source_lang, target_lang):
+    lang_map = {'es': 'spa', 'en': 'eng', 'de': 'deu'}
+    src = lang_map.get(source_lang, source_lang)
+    tgt = lang_map.get(target_lang, target_lang)
+    
+    if src == tgt:
+        return text
+        
+    direct_modes = ['eng-spa', 'spa-eng', 'eng-deu', 'deu-eng']
+    mode = f"{src}-{tgt}"
+    if mode in direct_modes:
+        return call_apertium(text, mode)
+    else:
+        if src != 'eng' and tgt != 'eng':
+            intermediate = call_apertium(text, f"{src}-eng")
+            return call_apertium(intermediate, f"eng-{tgt}")
+    return text
+
+def translate_page(text, target_lang, source_lang='en'):
     if not text.strip():
         return ""
+    
+    service = os.environ.get('TRANSLATOR_SERVICE', 'google').lower()
+    if service == 'apertium':
+        print(f"🌐 Traduciendo con Apertium local ({source_lang} -> {target_lang})...")
+        return translate_apertium(text, source_lang, target_lang)
+        
+    import time
     try:
         from deep_translator import GoogleTranslator
         translator = GoogleTranslator(source='auto', target=target_lang)
         # Handle chunking if too long (Google Translate limit is 5000 chars)
         chunks = [text[i:i+4000] for i in range(0, len(text), 4000)]
-        translated_chunks = [translator.translate(chunk) for chunk in chunks if chunk.strip()]
+        translated_chunks = []
+        for chunk in chunks:
+            if not chunk.strip():
+                continue
+            translated_chunk = None
+            attempt = 1
+            while True:
+                try:
+                    translated_chunk = translator.translate(chunk)
+                    if translated_chunk:
+                        break
+                except Exception as e:
+                    print(f"⚠️ Error translating chunk (attempt {attempt}) to {target_lang}: {e}")
+                print("⏳ Esperando 2 segundos para reintentar traducción...")
+                time.sleep(2)
+                attempt += 1
+            
+            translated_chunks.append(translated_chunk)
         return " ".join(translated_chunks)
     except Exception as e:
         print(f"⚠️ Error translating to {target_lang}: {e}. Falling back to original text.")
@@ -171,7 +248,7 @@ def process_page(pdf_path, page, orig_lang, cache_entry):
         elif lang == orig_lang:
             result[lang] = cleaned_text
         else:
-            result[lang] = translate_page(cleaned_text, lang)
+            result[lang] = translate_page(cleaned_text, lang, orig_lang)
             
     return result
 
